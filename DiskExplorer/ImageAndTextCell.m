@@ -1,0 +1,228 @@
+
+#import "ImageAndTextCell.h"
+
+#define kIconImageSize          16.0
+
+#define kImageOriginXOffset     3
+#define kImageOriginYOffset     1
+
+#define kTextOriginXOffset      2
+#define kTextOriginYOffset      2
+#define kTextHeightAdjust       4
+
+@interface ImageAndTextCell ()
+
+@end
+
+@implementation ImageAndTextCell
+
+@synthesize image;
+
+// -------------------------------------------------------------------------------
+//	init
+// -------------------------------------------------------------------------------
+- (id)init
+{
+	self = [super init];
+	if (self)
+    {
+        // we want a smaller font
+        [self setFont: [NSFont systemFontOfSize:[NSFont smallSystemFontSize]]];
+
+        _attr = [[NSDictionary dictionaryWithObjectsAndKeys:
+                         [self font], NSFontAttributeName,
+                         [NSColor blackColor], NSForegroundColorAttributeName,
+                         nil ] retain];
+    }
+	return self;
+}
+
+// -------------------------------------------------------------------------------
+//	dealloc
+// -------------------------------------------------------------------------------
+- (void)dealloc
+{
+    [image release];
+    [super dealloc];
+}
+
+// -------------------------------------------------------------------------------
+//	copyWithZone:zone
+// -------------------------------------------------------------------------------
+- (id)copyWithZone:(NSZone *)zone
+{
+    ImageAndTextCell *cell = (ImageAndTextCell*)[super copyWithZone:zone];
+    cell.image = [image retain];
+    
+    [cell setImage: image];
+    
+    return cell;
+}
+
+// -------------------------------------------------------------------------------
+//	setImage:anImage
+// -------------------------------------------------------------------------------
+- (void)setImage:(NSImage *)anImage
+{
+    if (anImage != image)
+	{
+        [image release];
+        image = [anImage retain];
+		[image setSize: NSMakeSize(kIconImageSize, kIconImageSize)];
+
+        [self setObjectValue: image];
+        
+        [self setImage: image];
+    }
+}
+
+// -------------------------------------------------------------------------------
+//	setStringValue:aString
+// -------------------------------------------------------------------------------
+- (void)setStringValue:(NSString *)aString
+{
+    string = aString;
+
+    if (aString != string)
+	{
+        [string release];
+        string = [aString retain];
+    }
+}
+
+// -------------------------------------------------------------------------------
+//	image:
+// -------------------------------------------------------------------------------
+- (NSImage *)image
+{
+    return image;
+}
+
+// -------------------------------------------------------------------------------
+//	isGroupCell:
+// -------------------------------------------------------------------------------
+- (BOOL)isGroupCell
+{
+    return ([self image] == nil && [[self title] length] > 0);
+}
+
+// -------------------------------------------------------------------------------
+//	titleRectForBounds:cellRect
+//
+//	Returns the proper bound for the cell's title while being edited
+// -------------------------------------------------------------------------------
+- (NSRect)titleRectForBounds:(NSRect)cellRect
+{	
+	// the cell has an image: draw the normal item cell
+	NSSize imageSize;
+	NSRect imageFrame;
+
+	imageSize = [image size];
+	NSDivideRect(cellRect, &imageFrame, &cellRect, 3 + imageSize.width, NSMinXEdge);
+
+	imageFrame.origin.x += kImageOriginXOffset;
+	imageFrame.origin.y -= kImageOriginYOffset;
+	imageFrame.size = imageSize;
+	
+	imageFrame.origin.y += ceil((cellRect.size.height - imageFrame.size.height) / 2);
+	
+	NSRect newFrame = cellRect;
+	newFrame.origin.x += kTextOriginXOffset;
+	newFrame.origin.y += kTextOriginYOffset;
+	newFrame.size.height -= kTextHeightAdjust;
+
+    if(string)
+    {
+        NSSize size = [string sizeWithAttributes: _attr];
+        
+        newFrame.size.height += size.height;
+        newFrame.size.width += size.width;
+    }
+    
+	return newFrame;
+}
+
+// -------------------------------------------------------------------------------
+//	editWithFrame:inView:editor:delegate:event
+// -------------------------------------------------------------------------------
+- (void)editWithFrame:(NSRect)aRect inView:(NSView*)controlView editor:(NSText*)textObj delegate:(id)anObject event:(NSEvent*)theEvent
+{
+	NSRect textFrame = [self titleRectForBounds:aRect];
+	[super editWithFrame:textFrame inView:controlView editor:textObj delegate:anObject event:theEvent];
+}
+
+// -------------------------------------------------------------------------------
+//	selectWithFrame:inView:editor:delegate:event:start:length
+// -------------------------------------------------------------------------------
+- (void)selectWithFrame:(NSRect)aRect inView:(NSView *)controlView editor:(NSText *)textObj delegate:(id)anObject start:(NSInteger)selStart length:(NSInteger)selLength
+{
+	NSRect textFrame = [self titleRectForBounds:aRect];
+	[super selectWithFrame:textFrame inView:controlView editor:textObj delegate:anObject start:selStart length:selLength];
+}
+
+// -------------------------------------------------------------------------------
+//	drawWithFrame:cellFrame:controlView:
+// -------------------------------------------------------------------------------
+- (void)drawWithFrame:(NSRect)cellFrame inView:(NSView*)controlView
+{
+	if (self.image)
+	{
+        // the cell has an image: draw the normal item cell
+        NSSize imageSize;
+        NSRect imageFrame;
+
+        imageSize = [image size];
+        NSDivideRect(cellFrame, &imageFrame, &cellFrame, 3 + imageSize.width, NSMinXEdge);
+
+        imageFrame.origin.x += kImageOriginXOffset;
+        imageFrame.origin.y -= kImageOriginYOffset;
+        imageFrame.size = imageSize;
+
+        if ([controlView isFlipped])
+            imageFrame.origin.y += ceil((cellFrame.size.height + imageFrame.size.height) / 2);
+        else
+            imageFrame.origin.y += ceil((cellFrame.size.height - imageFrame.size.height) / 2);
+        [image compositeToPoint:imageFrame.origin operation:NSCompositeSourceOver];
+
+//        [image drawAtPoint:imageFrame.origin fromRect: imageFrame operation: NSCompositeSourceOver fraction: 1.0];
+        
+        //[image drawAtPoint: imageFrame.origin fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
+        
+        NSRect newFrame = cellFrame;
+        newFrame.origin.x += kTextOriginXOffset;
+        newFrame.origin.y += kTextOriginYOffset;
+        newFrame.size.height -= kTextHeightAdjust;
+        
+        [string drawInRect:newFrame withAttributes: _attr];
+
+        newFrame.origin.x += [string length] * [NSFont smallSystemFontSize];
+        
+        // [super drawWithFrame:newFrame inView:controlView];
+    }
+	else
+	{
+		if ([self isGroupCell])
+		{
+            // Center the text in the cellFrame, and call super to do thew ork of actually drawing. 
+            CGFloat yOffset = floor((NSHeight(cellFrame) - [[self attributedStringValue] size].height) / 2.0);
+            
+            cellFrame.origin.y += yOffset;
+            cellFrame.size.height -= (kTextOriginYOffset*yOffset);
+
+            [super drawWithFrame:cellFrame inView:controlView];
+		}
+	}
+}
+
+// -------------------------------------------------------------------------------
+//	cellSize:
+// -------------------------------------------------------------------------------
+- (NSSize)cellSize
+{
+    NSSize cellSize = [super cellSize];
+    cellSize.width += (image ? [image size].width : 0) + 3;
+    return cellSize;
+}
+
+@end
+
